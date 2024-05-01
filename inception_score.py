@@ -1,17 +1,17 @@
-import torch
 import os
+import numpy as np
+from scipy.stats import entropy
 from PIL import Image
+
+import torch
 from torch import nn
 import torch.utils.data
 from torch.autograd import Variable
 from torch.nn import functional as F
-import torchvision.datasets as dset
 import torchvision.transforms as transforms
 
-from torchvision.models.inception import inception_v3
+from inception_model_train import modify_inception_v3
 
-import numpy as np
-from scipy.stats import entropy
 
 def inception_score(imgs, cuda=True, batch_size=32, resize=False, splits=1):
     """Computes the inception score of the generated images imgs
@@ -37,20 +37,21 @@ def inception_score(imgs, cuda=True, batch_size=32, resize=False, splits=1):
     # Set up dataloader
     dataloader = torch.utils.data.DataLoader(imgs, batch_size=batch_size)
 
-    # Load inception model
-    inception_model = inception_v3(weights=True, transform_input=False).type(dtype)
-    inception_model.eval();
-    up = nn.Upsample(size=(299, 299), mode='bilinear').type(dtype)
+    # Load the pretrained inception model
+    inception_model = modify_inception_v3()
+    inception_model.load_state_dict(torch.load('mnist_inception_v3.pth'))
+    #inception_model = inception_v3(weights=True, transform_input=False).type(dtype)
+    inception_model.eval()
 
+    up = nn.Upsample(size=(299, 299), mode='bilinear').type(dtype)
     def get_pred(x):
         if resize:
             x = up(x)
         x = inception_model(x)    
-        return F.softmax(x).data.cpu().numpy()
+        return F.softmax(x, dim=1).data.cpu().numpy()
 
     # Get predictions
-    preds = np.zeros((N, 1000))
-
+    preds = np.zeros((N, 10))          # Modified inception model only classifies 10 jclasses
     for i, batch in enumerate(dataloader, 0):
         batch = batch.type(dtype)
         #print("Batch tensor shape:", batch.shape)
@@ -94,19 +95,19 @@ class CustomMNISTDataset(torch.utils.data.Dataset):
         return image
     
 
+class IgnoreLabelDataset(torch.utils.data.Dataset):
+    def __init__(self, orig):
+        self.orig = orig
+
+    def __getitem__(self, index):
+        return self.orig[index]
+
+    def __len__(self):
+        return len(self.orig)   
+
 
 if __name__ == '__main__':
     
-    class IgnoreLabelDataset(torch.utils.data.Dataset):
-        def __init__(self, orig):
-            self.orig = orig
-
-        def __getitem__(self, index):
-            return self.orig[index]
-
-        def __len__(self):
-            return len(self.orig)
-
     # Your folder path
     image_folder_path = 'data\generated_images_basic_unet\generated_images_basic_unet'
 
