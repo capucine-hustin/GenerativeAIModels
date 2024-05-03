@@ -10,3 +10,5 @@ This repository contains all of our implemented model for our final project, inc
 5. Diffusion model
 6. PixelCNN
 
+For the inception score calculation, we trained two classifiers: a ViT transformer classifier and a Inception V3 classifier. 
+
